@@ -10,7 +10,8 @@ workflow:
 variables:
   TF_AUTO_DEPLOY: "true"
   GOOGLE_APPLICATION_CREDENTIALS: credentials.json
-  GCP_SA: gitlab-ci@showcase-afa3.iam.gserviceaccount.com
+  GCP_SERVICE_ACCOUNT: gitlab-ci@showcase-afa3.iam.gserviceaccount.com
+  GCP_SERVICE_ACCOUNT_VIEWER: gitlab-ci-viewer@showcase-afa3.iam.gserviceaccount.com
   WORKLOAD_IDENTITY_POOL_PROVIDER_NAME: projects/245154645891/locations/global/workloadIdentityPools/gitlab-pool-oidc-51824816/providers/gitlab-jwt-51824816
 
 stages:
@@ -37,6 +38,13 @@ gcp-auth:
       --service-account="${GCP_SA}"
       --output-file=credentials.json
       --credential-source-file=.ci_job_jwt_file
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      variables:
+        GCP_SA: $GCP_SERVICE_ACCOUNT
+    - when: always
+      variables:
+        GCP_SA: $GCP_SERVICE_ACCOUNT_VIEWER
 
 build:
   extends: .terraform:build
