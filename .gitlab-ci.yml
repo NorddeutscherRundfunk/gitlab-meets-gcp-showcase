@@ -1,0 +1,50 @@
+include:
+  - template: Terraform/Base.gitlab-ci.yml # https://gitlab.com/gitlab-org/gitlab/blob/master/lib/gitlab/ci/templates/Terraform/Base.gitlab-ci.yml
+
+workflow:
+  rules:
+    - if: $CI_MERGE_REQUEST_IID
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_PIPELINE_SOURCE == "web"
+
+variables:
+  TF_AUTO_DEPLOY: "true"
+  GOOGLE_APPLICATION_CREDENTIALS: credentials.json
+  GCP_SA: gitlab-ci@showcase-afa3.iam.gserviceaccount.com
+  WORKLOAD_IDENTITY_POOL_PROVIDER_NAME: projects/245154645891/locations/global/workloadIdentityPools/gitlab-pool-oidc-51824816/providers/gitlab-jwt-51824816
+
+stages:
+  - auth
+  - build
+  - deploy
+
+default:
+  id_tokens:
+    GCP_TOKEN:
+      aud: https://gitlab.com
+  before_script:
+    - echo ${GCP_TOKEN} > .ci_job_jwt_file
+
+gcp-auth:
+  image: google/cloud-sdk:alpine
+  stage: auth
+  artifacts:
+    public: false
+    paths:
+      - credentials.json
+  script:
+    - gcloud iam workload-identity-pools create-cred-config ${WORKLOAD_IDENTITY_POOL_PROVIDER_NAME}
+      --service-account="${GCP_SA}"
+      --output-file=credentials.json
+      --credential-source-file=.ci_job_jwt_file
+
+build:
+  extends: .terraform:build
+  dependencies:
+    - gcp-auth
+
+deploy:
+  extends: .terraform:deploy
+  dependencies:
+    - gcp-auth
+    - build
