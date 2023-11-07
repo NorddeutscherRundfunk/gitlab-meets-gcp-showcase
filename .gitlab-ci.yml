@@ -53,8 +53,6 @@ build:
 
 deploy:
   extends: .terraform:deploy
-  rules:
-    - when: always
   dependencies:
     - gcp-auth
     - build
